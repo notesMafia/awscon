@@ -10,36 +10,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Setup SSH
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+      - name: Set up SSH key
+        run: |
+          echo "${{ secrets.EC2_KEY }}" > ec2_key.pem
+          chmod 400 ec2_key.pem
 
-    - name: Deploy to EC2
-      run: |
-        ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-          cd /var/www/gitman
-
-          # If .git doesn't exist, clone the repo
-          if [ ! -d ".git" ]; then
-            git clone https://github.com/YOUR_USERNAME/YOUR_REPO.git .
-          fi
-
-          # Pull latest code
-          git pull origin main
-
-          # Optional: run Laravel and React setup commands
-          composer install --no-interaction --prefer-dist
-          npm install
-          npm run build
-
-          php artisan migrate --force
-          php artisan config:cache
-          php artisan route:cache
-          php artisan view:cache
-        EOF
+      - name: Deploy to EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            if [ ! -d /var/www/gitman/.git ]; then
+              rm -rf /var/www/gitman/*
+              git clone https://github.com/notesMafia/awscon.git /var/www/gitman
+            else
+              cd /var/www/gitman
+              git pull origin main
+            fi
+          EOF
